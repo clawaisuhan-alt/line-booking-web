@@ -3,6 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- 除錯頁：LINE 內建瀏覽器快取很兇，改完常常拿到舊版。
+     meta 只是盡力而為（靜態站無法自訂 HTTP 標頭），真的沒更新時
+     改用 https://liff.line.me/<liffId>?v=<隨便換一個數字> 一定繞得掉。 -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>LIFF whoami — line-booking</title>
 <style>
   :root{
