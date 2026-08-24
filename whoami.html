@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LIFF whoami — line-booking</title>
+<style>
+  :root{
+    --bg:#f6f7f6; --card:#fff; --ink:#16191c; --muted:#5f6a67;
+    --rule:#dde2df; --ok:#1c5c57; --err:#97271f; --errbg:#f9ecea;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#111514;--card:#181d1c;--ink:#e7ebe8;--muted:#98a39f;
+          --rule:#2b3230;--ok:#69c0b5;--err:#e58278;--errbg:#331916;}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif;
+    padding:1.25rem 1rem 3rem;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:34rem;margin:0 auto;display:flex;flex-direction:column;gap:1rem}
+  h1{font-size:1.15rem;margin:0}
+  .sub{color:var(--muted);font-size:.85rem;margin:0}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:.6rem;padding:1rem;
+    display:flex;flex-direction:column;gap:.85rem}
+  .field{display:flex;flex-direction:column;gap:.35rem}
+  .k{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9rem;
+    word-break:break-all;background:var(--bg);border:1px solid var(--rule);
+    border-radius:.35rem;padding:.5rem .6rem}
+  button{font:inherit;font-size:.9rem;padding:.6rem 1rem;border-radius:.4rem;
+    border:1px solid var(--ok);background:var(--ok);color:#fff;cursor:pointer;width:100%}
+  button.ghost{background:transparent;color:var(--ok)}
+  button:active{opacity:.75}
+  .err{background:var(--errbg);border:1px solid var(--err);color:var(--err);
+    border-radius:.5rem;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.5rem}
+  .err .k{color:var(--err)}
+  .warn{font-size:.8rem;color:var(--muted);line-height:1.5}
+  #status{font-size:.8rem;color:var(--muted);font-family:ui-monospace,monospace}
+  .hide{display:none}
+  img.avatar{width:56px;height:56px;border-radius:50%;border:1px solid var(--rule)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>LIFF whoami</h1>
+    <p class="sub">取得自己的 LINE userId，填入 GAS 的 ADMIN_USER_IDS</p>
+  </div>
+
+  <p id="status">載入 LIFF SDK…</p>
+
+  <div id="error" class="err hide">
+    <span class="k">錯誤</span>
+    <div id="errBody"></div>
+  </div>
+
+  <div id="result" class="card hide">
+    <img id="avatar" class="avatar hide" alt="">
+    <div class="field">
+      <span class="k">userId — 這串才是你要的</span>
+      <div class="v" id="userId"></div>
+      <button id="copyId">複製 userId</button>
+    </div>
+    <div class="field">
+      <span class="k">displayName</span>
+      <div class="v" id="displayName"></div>
+    </div>
+    <div class="field">
+      <span class="k">環境</span>
+      <div class="v" id="env"></div>
+    </div>
+  </div>
+
+  <div id="tokenCard" class="card hide">
+    <div class="field">
+      <span class="k">ID Token — 測 verifyIdToken 時才需要</span>
+      <button id="copyToken" class="ghost">複製 ID Token</button>
+      <p class="warn">這是短效憑證，用來驗證後端的 verifyIdToken。
+        不要貼進聊天室、不要提交進版控。過期後重開此頁即可取得新的。</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // booking-dev。要改用 admin-dev 就換成 2011187534-7AVcJ9o4
+  var LIFF_ID = '2011187534-1zGL0McE';
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function setStatus(t) { $('status').textContent = t; }
+
+  function fail(where, e) {
+    setStatus('');
+    $('error').classList.remove('hide');
+    var code = (e && e.code) ? e.code : '(無 code)';
+    var msg = (e && e.message) ? e.message : String(e);
+    $('errBody').innerHTML =
+      '<div class="v">' + where + '\ncode: ' + esc(code) + '\n' + esc(msg) + '</div>';
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+    });
+  }
+
+  // LINE 內建瀏覽器對 navigator.clipboard 支援不一致，保留 execCommand 後備
+  function copy(text, btn, label) {
+    var done = function () {
+      var old = btn.textContent;
+      btn.textContent = '已複製 ✓';
+      setTimeout(function () { btn.textContent = old; }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { legacy(text, done, label); });
+    } else {
+      legacy(text, done, label);
+    }
+  }
+
+  function legacy(text, done, label) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    if (ok) { done(); } else { window.prompt('自動複製失敗，請手動選取' + label + '：', text); }
+  }
+
+  if (typeof liff === 'undefined') {
+    fail('LIFF SDK 載入失敗（檢查網路或 CSP）', {});
+    return;
+  }
+
+  setStatus('liff.init…');
+
+  liff.init({ liffId: LIFF_ID }).then(function () {
+    var inClient = liff.isInClient();
+    setStatus('init OK · SDK ' + liff.getVersion() + ' · ' +
+      (inClient ? 'LINE 內建瀏覽器' : '外部瀏覽器'));
+
+    if (!liff.isLoggedIn()) {
+      setStatus('未登入，導向 LINE Login…');
+      liff.login();
+      return;
+    }
+
+    return liff.getProfile().then(function (p) {
+      $('result').classList.remove('hide');
+      $('userId').textContent = p.userId;
+      $('displayName').textContent = p.displayName || '(未設定)';
+      $('env').textContent =
+        'inClient: ' + inClient + '\nos: ' + liff.getOS() +
+        '\nlanguage: ' + liff.getLanguage() +
+        '\nliffId: ' + LIFF_ID;
+
+      if (p.pictureUrl) {
+        $('avatar').src = p.pictureUrl;
+        $('avatar').classList.remove('hide');
+      }
+
+      $('copyId').addEventListener('click', function () {
+        copy(p.userId, $('copyId'), ' userId');
+      });
+
+      var idToken = liff.getIDToken();
+      if (idToken) {
+        $('tokenCard').classList.remove('hide');
+        $('copyToken').addEventListener('click', function () {
+          copy(idToken, $('copyToken'), ' ID Token');
+        });
+      }
+    });
+  }).catch(function (e) {
+    fail('liff.init 或 getProfile 失敗', e);
+  });
+})();
