@@ -25,8 +25,11 @@
   .field{display:flex;flex-direction:column;gap:.35rem}
   .k{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
   .v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9rem;
-    word-break:break-all;background:var(--bg);border:1px solid var(--rule);
+    word-break:break-all;white-space:pre-wrap;background:var(--bg);border:1px solid var(--rule);
     border-radius:.35rem;padding:.5rem .6rem}
+  .pass{color:var(--ok);font-weight:600}
+  .fail{color:var(--err);font-weight:600}
+  button:disabled{opacity:.5;cursor:default}
   button{font:inherit;font-size:.9rem;padding:.6rem 1rem;border-radius:.4rem;
     border:1px solid var(--ok);background:var(--ok);color:#fff;cursor:pointer;width:100%}
   button.ghost{background:transparent;color:var(--ok)}
@@ -79,6 +82,21 @@
         不要貼進聊天室、不要提交進版控。過期後重開此頁即可取得新的。</p>
     </div>
   </div>
+
+  <div id="backendCard" class="card hide">
+    <div class="field">
+      <span class="k">後端 whoami — 端到端驗證</span>
+      <p class="warn">按下去會一次驗證四件事：<b>瀏覽器層 CORS</b>、後端
+        <b>verifyIdToken</b>、<b>isAdmin</b> 判定、<b>isFriend</b> 好友查詢。</p>
+      <button id="callBackend">呼叫後端 whoami</button>
+    </div>
+    <div id="backendOut" class="field hide">
+      <span class="k">判讀</span>
+      <div class="v" id="backendVerdict"></div>
+      <span class="k">原始回應</span>
+      <div class="v" id="backendRaw"></div>
+    </div>
+  </div>
 </div>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -88,6 +106,12 @@
 
   // booking-dev。要改用 admin-dev 就換成 2011187534-7AVcJ9o4
   var LIFF_ID = '2011187534-1zGL0McE';
+
+  // 正本部署端點。換網址等於這裡也要改，所以 clasp deploy 一定要帶 -i
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbyxFgaXWd932IzRUb2wqH-r164B3t3K-F0gkxls9DpK7vfZR6_7DM1FeuJjGFTjh3R1Og/exec';
+
+  // aud 應等於 LOGIN_CHANNEL_ID；不符代表 LIFF 與 Login channel 對不起來
+  var EXPECT_AUD = '2011187534';
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -137,6 +161,88 @@
     if (ok) { done(); } else { window.prompt('自動複製失敗，請手動選取' + label + '：', text); }
   }
 
+  function mark(ok, text) {
+    return '<span class="' + (ok ? 'pass' : 'fail') + '">' +
+           (ok ? '\u2713' : '\u2717') + ' ' + esc(text) + '</span>';
+  }
+
+  /**
+   * 呼叫後端 whoami。
+   * Content-Type 必須是 text/plain：GAS 的 /exec 不處理 preflight 的 OPTIONS，
+   * 用 application/json 會觸發 preflight，整個請求會被瀏覽器擋掉（規格 §8.1）。
+   */
+  function callWhoami(idToken, frontUserId) {
+    var btn = $('callBackend');
+    btn.disabled = true;
+    btn.textContent = '呼叫中…';
+    var t0 = Date.now();
+
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'whoami', payload: { idToken: idToken } })
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        return { status: res.status, text: text };
+      });
+    }).then(function (r) {
+      $('backendOut').classList.remove('hide');
+      $('backendRaw').textContent =
+        'HTTP ' + r.status + ' \u00b7 ' + (Date.now() - t0) + ' ms\n' + r.text;
+      var body;
+      try {
+        body = JSON.parse(r.text);
+      } catch (e) {
+        $('backendVerdict').innerHTML =
+          mark(true, 'CORS 通過（回應讀得到）') + '\n' +
+          mark(false, '回應不是 JSON') + '\n' +
+          'GAS 丟了 HTML 錯誤頁。多半是部署版本有問題，或 /exec 網址不對。';
+        return;
+      }
+      renderVerdict(body, frontUserId);
+    }).catch(function (e) {
+      // fetch 直接 reject = 請求沒送出或回應被瀏覽器擋下，這正是本頁最想驗的一件事
+      $('backendOut').classList.remove('hide');
+      $('backendRaw').textContent = String(e);
+      $('backendVerdict').innerHTML =
+        mark(false, '請求沒送達，或回應被瀏覽器擋下') + '\n' +
+        'fetch 直接 reject。最可能是 CORS 被擋（檢查 Content-Type 有沒有被改成 ' +
+        'application/json），其次是網路不通。';
+    }).then(function () {
+      btn.disabled = false;
+      btn.textContent = '再呼叫一次';
+    });
+  }
+
+  function renderVerdict(body, frontUserId) {
+    var out = [mark(true, 'CORS 通過（回應讀得到）')];
+
+    if (!body.ok) {
+      var code = (body.error && body.error.code) || '(無 code)';
+      var msg = (body.error && body.error.message) || '';
+      out.push(mark(false, '後端拒絕：' + code));
+      out.push(esc(msg));
+      if (msg.indexOf('未知的 action') !== -1) {
+        out.push('\n\u26a0 後端不認得 whoami：程式碼推上去了，但<b>部署還停在舊版本</b>。\n' +
+                 '要跑 clasp deploy -i &lt;deploymentId&gt; 才會生效。');
+      }
+      $('backendVerdict').innerHTML = out.join('\n');
+      return;
+    }
+
+    var d = body.data || {};
+    var same = (d.userId === frontUserId);
+    out.push(mark(true, 'verifyIdToken 通過'));
+    out.push(mark(same, same ? 'userId 與前端相符' : 'userId 與前端不符 —— ' + d.userId));
+    out.push(mark(d.isAdmin === true, 'isAdmin = ' + d.isAdmin));
+    out.push(d.isFriend === null
+      ? mark(false, 'isFriend = null（好友查詢失敗，去看 GAS log）')
+      : mark(d.isFriend === true, 'isFriend = ' + d.isFriend));
+    out.push(mark(d.tokenAudience === EXPECT_AUD, 'aud = ' + d.tokenAudience));
+    out.push('exp: ' + esc(d.tokenExpiresAt || '(無)'));
+    $('backendVerdict').innerHTML = out.join('\n');
+  }
+
   if (typeof liff === 'undefined') {
     fail('LIFF SDK 載入失敗（檢查網路或 CSP）', {});
     return;
@@ -178,6 +284,11 @@
         $('tokenCard').classList.remove('hide');
         $('copyToken').addEventListener('click', function () {
           copy(idToken, $('copyToken'), ' ID Token');
+        });
+
+        $('backendCard').classList.remove('hide');
+        $('callBackend').addEventListener('click', function () {
+          callWhoami(idToken, p.userId);
         });
       }
     });
