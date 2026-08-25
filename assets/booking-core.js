@@ -125,12 +125,29 @@
         }, 90);
       });
     }
-    var u = new URL(CFG.GAS_URL);
-    u.searchParams.set('action', action);
-    Object.keys(params || {}).forEach(function (k) { u.searchParams.set(k, params[k]); });
-    if (LB.idToken) u.searchParams.set('idToken', LB.idToken);
-    return fetch(u.toString(), { method: 'GET', redirect: 'follow' })
-      .then(function (r) { return r.json(); });
+    /* 傳輸方式抄自 whoami.html —— 那支是實際打通過的。
+       Content-Type 必須是 text/plain：GAS 的 /exec 不處理 preflight 的 OPTIONS，
+       改成 application/json 會觸發 preflight，整個請求會被瀏覽器擋掉（規格 §8.1）。 */
+    var payload = {};
+    Object.keys(params || {}).forEach(function (k) { payload[k] = params[k]; });
+    if (LB.idToken) payload.idToken = LB.idToken;
+
+    return fetch(CFG.GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      redirect: 'follow',
+      body: JSON.stringify({ action: action, payload: payload })
+    }).then(function (r) {
+      return r.text();
+    }).then(function (t) {
+      try {
+        return JSON.parse(t);
+      } catch (e) {
+        /* GAS 丟 HTML 錯誤頁時會走到這裡。剛 deploy 完的幾秒內是正常現象，
+           重試即可；持續發生就是部署版本有問題或 /exec 網址不對。 */
+        throw { code: 'BAD_RESPONSE', message: '後端回的不是 JSON，多半是部署版本有問題或網址不對' };
+      }
+    });
   }
 
   /* ── 元件 ───────────────────────────────────────────────────── */

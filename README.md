@@ -35,7 +35,9 @@ node serve.js     # http://localhost:8788
 
 `assets/config.js` 的 `GAS_URL` 留空時前端走 **MOCK 模式**，用本機模擬資料
 （週二三五六開放、提前 24 小時、730 天上限），不必連後端就能調樣式。
-`GAS_URL` 是環境值，刻意不進這個公開 repo。
+
+`/exec` 網址本身不是機密（存取控制走 `idToken`，`whoami.html` 裡也寫著同一個值）。
+`booking.html` 之所以還留空，是因為 `getMonth` / `getDay` 的回應形狀尚未對過規格 §8。
 
 ## LIFF app
 
