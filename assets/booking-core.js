@@ -71,36 +71,42 @@
     return hash(dateStr + '#' + idx) % 4 === 0 ? 'booked' : 'open';
   }
 
+  /* 刻意產生與 getMonth 相同的形狀：以日期為鍵的物件，每日 {state, open, booked}。
+     open 是「該日依規則可預約的格數」（容量），不是 SLOT_COUNT，也不是剩餘數。
+     MOCK 與正式後端因此共用同一條轉接路徑，切換時不會有形狀落差。 */
   function mockMonth(ym) {
     var base = parseISO(ym + '-01');
-    var n = daysInMonth(base), out = [], i, j, dateStr, st, free;
+    var n = daysInMonth(base), out = {}, i, j, dateStr, st, capacity, booked, slotSt;
     for (i = 1; i <= n; i++) {
       dateStr = ym + '-' + pad(i);
       st = mockState(dateStr);
-      free = 0;
+      capacity = 0; booked = 0;
       if (st === 'open') {
         for (j = 0; j < CFG.SLOT_COUNT; j++) {
-          if (mockSlotState(dateStr, j, st) === 'open') free++;
+          slotSt = mockSlotState(dateStr, j, st);
+          if (slotSt === 'open') capacity++;
+          else if (slotSt === 'booked') { capacity++; booked++; }
         }
-        if (free === 0) st = 'full';
+        if (capacity === 0) st = 'closed';
+        else if (booked === capacity) st = 'full';
       }
-      out.push({
-        date: dateStr, state: st, openCount: free,
-        totalCount: CFG.SLOT_COUNT, note: ''
-      });
+      out[dateStr] = { state: st, open: capacity, booked: booked };
     }
     return out;
   }
 
+  /* 後端的 getDay 會濾掉 state 為 closed 的格（規格 §8.3，避免暴露完整時段結構），
+     MOCK 也照做，否則前端會在 MOCK 下看到正式環境永遠拿不到的格子。 */
   function mockDay(dateStr) {
-    var st = mockState(dateStr), i, out = [];
+    var st = mockState(dateStr), i, slotSt, out = [];
     for (i = 0; i < CFG.SLOT_COUNT; i++) {
+      slotSt = mockSlotState(dateStr, i, st);
+      if (slotSt === 'closed') continue;
       out.push({
         idx: i,
         start: MOCK_TIMES[i] ? MOCK_TIMES[i][0] : '',
         end: MOCK_TIMES[i] ? MOCK_TIMES[i][1] : '',
-        state: mockSlotState(dateStr, i, st),
-        note: ''
+        state: slotSt
       });
     }
     return out;
@@ -119,8 +125,8 @@
     if (isMock()) {
       return new Promise(function (res) {
         setTimeout(function () {
-          if (action === 'getMonth') res({ ok: true, data: { days: mockMonth(params.month) } });
-          else if (action === 'getDay') res({ ok: true, data: { slots: mockDay(params.date) } });
+          if (action === 'getMonth') res({ ok: true, data: mockMonth(params.month) });
+          else if (action === 'getDay') res({ ok: true, data: { date: params.date, slots: mockDay(params.date) } });
           else res({ ok: false, error: { code: 'MOCK_ONLY', message: action + ' 在 MOCK 模式下不可用' } });
         }, 90);
       });
@@ -128,8 +134,10 @@
     /* 傳輸方式抄自 whoami.html —— 那支是實際打通過的。
        Content-Type 必須是 text/plain：GAS 的 /exec 不處理 preflight 的 OPTIONS，
        改成 application/json 會觸發 preflight，整個請求會被瀏覽器擋掉（規格 §8.1）。 */
-    var payload = {};
-    Object.keys(params || {}).forEach(function (k) { payload[k] = params[k]; });
+    var payload = AD.request ? AD.request(action, params || {}) : {};
+    if (!AD.request) {
+      Object.keys(params || {}).forEach(function (k) { payload[k] = params[k]; });
+    }
     if (LB.idToken) payload.idToken = LB.idToken;
 
     return fetch(CFG.GAS_URL, {
