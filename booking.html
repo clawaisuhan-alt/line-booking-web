@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>預約 — line-booking</title>
+<link rel="stylesheet" href="assets/base.css">
+</head>
+<body class="lb-body">
+
+<div class="lb-shell">
+
+  <header class="lb-head">
+    <h1>預約</h1>
+    <p class="lb-sub" id="sub">載入中…</p>
+  </header>
+
+  <!-- ── 皮膚切換條 ──────────────────────────────────────────────
+       開發與試樣用。正式上線要固定樣式的話，把這個 <div> 整段刪掉，
+       皮膚仍會依 LB_CONFIG.DEFAULT_SKIN 或網址 ?skin= 生效。 -->
+  <div class="lb-skinbar">
+    <label for="skinPick">皮膚</label>
+    <select id="skinPick"></select>
+    <a href="skins.html">調色間 →</a>
+  </div>
+
+  <main id="app"></main>
+
+</div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+<script src="assets/config.js"></script>
+<script src="assets/skin-engine.js"></script>
+
+<!-- ── 皮膚 ────────────────────────────────────────────────────
+     新增一個皮膚 = 在 skins/ 放一個檔 + 這裡加一行。就這樣。 -->
+<script src="skins/classic.js"></script>
+<script src="skins/washi.js"></script>
+<script src="skins/neon.js"></script>
+<script src="skins/ledger.js"></script>
+
+<script src="assets/booking-core.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  var CFG = window.LB_CONFIG;
+  var sub = document.getElementById('sub');
+  var pick = document.getElementById('skinPick');
+
+  /* ── 皮膚選單 ── */
+  LB.Skins.boot();
+  LB.Skins.list().forEach(function (s) {
+    var o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = s.name;
+    pick.appendChild(o);
+  });
+  var cur = LB.Skins.current();
+  if (cur) pick.value = cur.id;
+  pick.addEventListener('change', function () { LB.Skins.apply(pick.value); });
+
+  /* ── 元件 ── */
+  var app = new LB.Booking(document.getElementById('app'));
+
+  function start(note) {
+    sub.textContent = note;
+    app.load();
+  }
+
+  if (LB.util.isMock()) {
+    start('MOCK 模式 — 未設定 GAS_URL，資料為本機模擬，適合調樣式。');
+    return;
+  }
+
+  if (typeof liff === 'undefined') {
+    start('LIFF SDK 載入失敗，改用唯讀顯示。');
+    return;
+  }
+
+  liff.init({ liffId: CFG.LIFF_ID }).then(function () {
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    LB.idToken = liff.getIDToken() || null;
+    return liff.getProfile().then(function (p) {
+      start((p.displayName || '') + ' — 請選擇日期');
+    });
+  }).catch(function (e) {
+    start('LIFF 初始化失敗（' + (e && e.code ? e.code : '無 code') + '），資料可能無法載入。');
+  });
+})();
+</script>
+
+</body>
+</html>

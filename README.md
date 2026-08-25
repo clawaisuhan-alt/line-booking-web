@@ -14,8 +14,28 @@
 
 | 檔案 | 用途 |
 |---|---|
+| `booking.html` | 預約頁。月曆 → 選日 → 選時段。`Bookings.create` 未實作前只到「已選」為止 |
+| `skins.html` | 調色間。拉一拉就能做出新皮膚，可匯出 `.js` |
 | `whoami.html` | 開發用。跑 `liff.getProfile()` 顯示自己的 userId，供填入 GAS 的 `ADMIN_USER_IDS` |
 | `index.html` | 佔位首頁 |
+
+## 皮膚系統
+
+樣式與行為是分開的：皮膚可以換色、換字、換版面、加裝飾，但改不動「哪一天能不能約」。
+撰寫方式與可用介面見 **[docs/SKIN.md](docs/SKIN.md)**；不寫程式的話直接開 `skins.html`。
+
+現成皮膚：`classic`（原色）、`washi`（和紙）、`neon`（霓虹）、`ledger`（帳本，清單式）。
+用 `?skin=washi` 可直接指定。
+
+## 本機預覽
+
+```
+node serve.js     # http://localhost:8788
+```
+
+`assets/config.js` 的 `GAS_URL` 留空時前端走 **MOCK 模式**，用本機模擬資料
+（週二三五六開放、提前 24 小時、730 天上限），不必連後端就能調樣式。
+`GAS_URL` 是環境值，刻意不進這個公開 repo。
 
 ## LIFF app
 

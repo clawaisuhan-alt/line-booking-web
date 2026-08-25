@@ -1,0 +1,370 @@
+/* ═══════════════════════════════════════════════════════════════
+   line-booking — 結構層 CSS
+   ───────────────────────────────────────────────────────────────
+   這一層負責「版面與可用性」，不負責「長相」。
+   規則：這個檔案裡不准出現寫死的顏色、字體、圓角、陰影，
+         一律走 --sk-* token，皮膚才有東西可以改。
+
+   皮膚可以安全依賴的 class / 屬性，見 docs/SKIN.md。
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 預設 token（= classic 皮膚的基準值）────────────────────── */
+:root {
+  --sk-bg:            #f6f7f6;
+  --sk-surface:       #ffffff;
+  --sk-surface-2:     #eef1ef;
+  --sk-ink:           #16191c;
+  --sk-ink-muted:     #5f6a67;
+  --sk-rule:          #dde2df;
+
+  --sk-accent:        #1c5c57;
+  --sk-accent-ink:    #ffffff;
+  --sk-accent-wash:   #e2efec;
+
+  --sk-open-bg:       var(--sk-surface);
+  --sk-open-ink:      var(--sk-ink);
+  --sk-open-rule:     var(--sk-rule);
+
+  --sk-closed-bg:     transparent;
+  --sk-closed-ink:    #b3bcb8;
+  --sk-closed-rule:   transparent;
+
+  --sk-full-bg:       var(--sk-surface-2);
+  --sk-full-ink:      var(--sk-ink-muted);
+
+  --sk-past-ink:      #c3ccc8;
+
+  --sk-sel-bg:        var(--sk-accent);
+  --sk-sel-ink:       var(--sk-accent-ink);
+  --sk-sel-rule:      var(--sk-accent);
+
+  --sk-danger:        #97271f;
+  --sk-danger-wash:   #f9ecea;
+
+  --sk-font:          -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif;
+  --sk-font-num:      var(--sk-font);
+  --sk-size:          16px;
+  --sk-line:          1.6;
+  --sk-day-size:      1.05rem;
+  --sk-day-weight:    500;
+  --sk-tracking:      0;
+  --sk-label-case:    none;
+
+  --sk-radius:        .6rem;
+  --sk-radius-sm:     .35rem;
+  --sk-cell-radius:   .45rem;
+  --sk-cell-ratio:    1 / 1;
+  --sk-gap:           .3rem;
+  --sk-pad:           1rem;
+  --sk-maxw:          34rem;
+
+  --sk-shadow:        none;
+  --sk-cell-shadow:   none;
+  --sk-sel-shadow:    none;
+  --sk-motion:        140ms ease;
+
+  --sk-deco-display:  block;   /* 皮膚不用裝飾層時設成 none */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-scheme="light"]) {
+    --sk-bg:          #111514;
+    --sk-surface:     #181d1c;
+    --sk-surface-2:   #212827;
+    --sk-ink:         #e7ebe8;
+    --sk-ink-muted:   #98a39f;
+    --sk-rule:        #2b3230;
+    --sk-accent:      #69c0b5;
+    --sk-accent-ink:  #08201e;
+    --sk-accent-wash: #17302d;
+    --sk-closed-ink:  #4b5553;
+    --sk-past-ink:    #3f4846;
+    --sk-danger:      #e58278;
+    --sk-danger-wash: #331916;
+  }
+}
+
+/* ── 骨架 ────────────────────────────────────────────────────── */
+
+* { box-sizing: border-box; }
+
+body.lb-body {
+  margin: 0;
+  padding: 1.1rem 1rem 4rem;
+  background: var(--sk-bg);
+  color: var(--sk-ink);
+  font-family: var(--sk-font);
+  font-size: var(--sk-size);
+  line-height: var(--sk-line);
+  letter-spacing: var(--sk-tracking);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+.lb-shell {
+  max-width: var(--sk-maxw);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.lb-head { display: flex; flex-direction: column; gap: .2rem; }
+.lb-head h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+.lb-head .lb-sub { margin: 0; color: var(--sk-ink-muted); font-size: .85rem; }
+
+/* ── 月曆 ────────────────────────────────────────────────────── */
+
+.lb-cal {
+  background: var(--sk-surface);
+  border: 1px solid var(--sk-rule);
+  border-radius: var(--sk-radius);
+  box-shadow: var(--sk-shadow);
+  padding: var(--sk-pad);
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
+.lb-cal__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+
+.lb-cal__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: var(--sk-font-num);
+  font-variant-numeric: tabular-nums;
+  text-transform: var(--sk-label-case);
+}
+
+.lb-nav {
+  font: inherit;
+  font-size: .9rem;
+  line-height: 1;
+  padding: .5rem .8rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--sk-rule);
+  border-radius: var(--sk-radius-sm);
+  background: var(--sk-surface);
+  color: var(--sk-ink);
+  cursor: pointer;
+  transition: background var(--sk-motion), border-color var(--sk-motion);
+}
+.lb-nav:hover:not(:disabled) { background: var(--sk-surface-2); }
+.lb-nav:disabled { opacity: .35; cursor: default; }
+.lb-nav:focus-visible { outline: 2px solid var(--sk-accent); outline-offset: 2px; }
+
+.lb-week,
+.lb-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--sk-gap);
+}
+
+.lb-week__cell {
+  text-align: center;
+  font-size: .72rem;
+  color: var(--sk-ink-muted);
+  letter-spacing: .06em;
+  padding-bottom: .1rem;
+  text-transform: var(--sk-label-case);
+}
+
+/* 單日格 —— 皮膚最常改的東西 */
+.lb-day {
+  position: relative;
+  aspect-ratio: var(--sk-cell-ratio);
+  min-height: 2.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .1rem;
+  border: 1px solid var(--sk-open-rule);
+  border-radius: var(--sk-cell-radius);
+  background: var(--sk-open-bg);
+  color: var(--sk-open-ink);
+  box-shadow: var(--sk-cell-shadow);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--sk-motion), color var(--sk-motion),
+              border-color var(--sk-motion), transform var(--sk-motion);
+}
+.lb-day:focus-visible { outline: 2px solid var(--sk-accent); outline-offset: 2px; }
+
+.lb-day__num {
+  font-family: var(--sk-font-num);
+  font-size: var(--sk-day-size);
+  font-weight: var(--sk-day-weight);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.lb-day__meta { font-size: .62rem; color: var(--sk-ink-muted); line-height: 1; }
+
+/* 裝飾層：皮膚唯一可以自由塞 DOM 的地方，永遠不吃點擊 */
+.lb-day__deco {
+  display: var(--sk-deco-display);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.lb-day[data-state="closed"] {
+  background: var(--sk-closed-bg);
+  border-color: var(--sk-closed-rule);
+  color: var(--sk-closed-ink);
+  cursor: default;
+}
+.lb-day[data-state="closed"] .lb-day__meta { color: inherit; }
+
+.lb-day[data-state="full"] {
+  background: var(--sk-full-bg);
+  color: var(--sk-full-ink);
+  cursor: default;
+}
+
+.lb-day[data-state="past"],
+.lb-day[data-state="out_of_range"] {
+  background: transparent;
+  border-color: transparent;
+  color: var(--sk-past-ink);
+  cursor: default;
+}
+
+.lb-day[data-blank="1"] { visibility: hidden; pointer-events: none; }
+
+.lb-day[aria-selected="true"] {
+  background: var(--sk-sel-bg);
+  border-color: var(--sk-sel-rule);
+  color: var(--sk-sel-ink);
+  box-shadow: var(--sk-sel-shadow);
+}
+.lb-day[aria-selected="true"] .lb-day__meta { color: inherit; opacity: .8; }
+
+/* ── agenda 佈局（皮膚以 layout: "agenda" 選用）──────────────── */
+
+.lb-cal[data-layout="agenda"] .lb-week { display: none; }
+.lb-cal[data-layout="agenda"] .lb-grid {
+  grid-template-columns: 1fr;
+  gap: var(--sk-gap);
+}
+.lb-cal[data-layout="agenda"] .lb-day {
+  aspect-ratio: auto;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: .7rem;
+  padding: .55rem .8rem;
+  min-height: 2.75rem;
+}
+.lb-cal[data-layout="agenda"] .lb-day[data-blank="1"] { display: none; }
+.lb-cal[data-layout="agenda"] .lb-day__meta { margin-left: auto; font-size: .72rem; }
+
+/* ── 時段面板 ────────────────────────────────────────────────── */
+
+.lb-slots {
+  background: var(--sk-surface);
+  border: 1px solid var(--sk-rule);
+  border-radius: var(--sk-radius);
+  box-shadow: var(--sk-shadow);
+  padding: var(--sk-pad);
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+.lb-slots__title { margin: 0; font-size: .95rem; font-weight: 600; }
+.lb-slotlist {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: .45rem;
+}
+
+.lb-slot { display: block; position: relative; }
+.lb-slot__btn {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding: .7rem .85rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--sk-open-rule);
+  border-radius: var(--sk-radius-sm);
+  background: var(--sk-open-bg);
+  color: var(--sk-open-ink);
+  cursor: pointer;
+  transition: background var(--sk-motion), border-color var(--sk-motion);
+}
+.lb-slot__btn:hover:not(:disabled) { border-color: var(--sk-accent); }
+.lb-slot__btn:focus-visible { outline: 2px solid var(--sk-accent); outline-offset: 2px; }
+.lb-slot__time {
+  font-family: var(--sk-font-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.lb-slot__tag { margin-left: auto; font-size: .74rem; color: var(--sk-ink-muted); }
+
+.lb-slot[data-state="booked"] .lb-slot__btn,
+.lb-slot[data-state="full"] .lb-slot__btn {
+  background: var(--sk-full-bg); color: var(--sk-full-ink);
+}
+.lb-slot[data-state="closed"] .lb-slot__btn,
+.lb-slot[data-state="past"] .lb-slot__btn,
+.lb-slot[data-state="out_of_range"] .lb-slot__btn {
+  background: transparent; color: var(--sk-past-ink); border-style: dashed;
+}
+.lb-slot__btn:disabled { cursor: default; }
+
+/* ── 狀態訊息 ────────────────────────────────────────────────── */
+
+.lb-msg { font-size: .82rem; color: var(--sk-ink-muted); }
+.lb-msg[data-tone="error"] {
+  color: var(--sk-danger);
+  background: var(--sk-danger-wash);
+  border: 1px solid var(--sk-danger);
+  border-radius: var(--sk-radius-sm);
+  padding: .7rem .85rem;
+}
+
+.lb-legend {
+  display: flex; flex-wrap: wrap; gap: .3rem .9rem;
+  font-size: .74rem; color: var(--sk-ink-muted);
+}
+.lb-legend span { display: inline-flex; align-items: center; gap: .35rem; }
+.lb-legend i {
+  width: .7rem; height: .7rem; border-radius: 2px;
+  border: 1px solid var(--sk-rule);
+  background: var(--sk-open-bg); font-style: normal;
+}
+.lb-legend i[data-k="closed"] { background: var(--sk-closed-bg); border-color: var(--sk-closed-ink); }
+.lb-legend i[data-k="full"]   { background: var(--sk-full-bg); }
+.lb-legend i[data-k="sel"]    { background: var(--sk-sel-bg); border-color: var(--sk-accent); }
+
+.lb-hide { display: none !important; }
+
+/* ── 皮膚切換條（正式上線時可整段移除，見 booking.html）──────── */
+.lb-skinbar {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  font-size: .78rem; color: var(--sk-ink-muted);
+}
+.lb-skinbar a { color: var(--sk-accent); text-underline-offset: .18em; }
+.lb-skinbar select {
+  font: inherit; font-size: .82rem; padding: .35rem .5rem;
+  border: 1px solid var(--sk-rule); border-radius: var(--sk-radius-sm);
+  background: var(--sk-surface); color: var(--sk-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
