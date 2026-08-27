@@ -163,6 +163,14 @@
         }, 90);
       });
     }
+    /* WebView 會把整頁連同過期的 idToken 一起從快取撈回來（LINE 內建瀏覽器尤甚）。
+       打出去之前先問頁面 token 還新不新鮮；過期就交給頁面重新登入（redirect），
+       並回傳一個永不 resolve 的 promise——頁面即將導走，別讓錯誤訊息閃出來。 */
+    if (typeof LB.checkTokenStale === 'function' && LB.checkTokenStale() &&
+        typeof LB.onAuthError === 'function' && LB.onAuthError()) {
+      return new Promise(function () {});
+    }
+
     /* 傳輸方式抄自 whoami.html —— 那支是實際打通過的。
        Content-Type 必須是 text/plain：GAS 的 /exec 不處理 preflight 的 OPTIONS，
        改成 application/json 會觸發 preflight，整個請求會被瀏覽器擋掉（規格 §8.1）。 */
@@ -180,6 +188,22 @@
     }).then(function (r) {
       return r.text();
     }).then(function (t) {
+      var body;
+      try {
+        body = JSON.parse(t);
+      } catch (e) {
+        e = null;
+        body = null;
+      }
+      if (body) {
+        /* 後端說 token 失效：同樣交給頁面自動重新登入，而不是把
+           「登入已失效」丟給看不懂的客戶。 */
+        if (body.ok === false && body.error && body.error.code === 'UNAUTHORIZED' &&
+            typeof LB.onAuthError === 'function' && LB.onAuthError()) {
+          return new Promise(function () {});
+        }
+        return body;
+      }
       try {
         return JSON.parse(t);
       } catch (e) {

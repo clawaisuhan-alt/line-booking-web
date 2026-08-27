@@ -137,8 +137,31 @@
   }
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
+  /* 過期頁面自救：偵測 + 自動重新登入，理由與 booking 頁相同 */
+  function tokenStale() {
+    try {
+      var d = liff.getDecodedIDToken();
+      return !d || !d.exp || (d.exp * 1000 - Date.now() < 60000);
+    } catch (e) { return true; }
+  }
+  function relogin() {
+    try {
+      var last = Number(sessionStorage.getItem('lba.relogin') || 0);
+      if (Date.now() - last < 120000) return false;
+      sessionStorage.setItem('lba.relogin', String(Date.now()));
+    } catch (e) {}
+    setStatus('登入已過期，自動重新登入中…');
+    try { liff.logout(); } catch (e) {}
+    liff.login({ redirectUri: window.location.href });
+    return true;
+  }
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) window.location.reload();
+  });
+
   /* text/plain 避開 preflight，理由同 booking 頁 */
   function call(action, payload) {
+    if (tokenStale() && relogin()) return new Promise(function () {});
     payload = payload || {};
     payload.idToken = idToken;
     return fetch(GAS_URL, {
@@ -149,7 +172,11 @@
       var b; try { b = JSON.parse(t); } catch (e) {
         throw { code: 'BAD_RESPONSE', message: '後端回的不是 JSON（剛 deploy 完稍等重試）' };
       }
-      if (!b.ok) throw (b.error || { code: 'UNKNOWN', message: '未知錯誤' });
+      if (!b.ok) {
+        var err = b.error || { code: 'UNKNOWN', message: '未知錯誤' };
+        if (err.code === 'UNAUTHORIZED' && relogin()) return new Promise(function () {});
+        throw err;
+      }
       return b.data;
     });
   }
@@ -324,7 +351,8 @@
   /* ── 起動 ── */
   if (typeof liff === 'undefined') { setStatus('LIFF SDK 載入失敗', 1); return; }
   liff.init({ liffId: LIFF_ID }).then(function () {
-    if (!liff.isLoggedIn()) { setStatus('未登入，導向 LINE Login…'); liff.login(); return; }
+    if (!liff.isLoggedIn()) { setStatus('未登入，導向 LINE Login…'); liff.login({ redirectUri: window.location.href }); return; }
+    if (tokenStale() && relogin()) return;
     idToken = liff.getIDToken();
     setStatus('');
     $('cal').classList.remove('hide');

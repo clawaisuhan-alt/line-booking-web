@@ -96,8 +96,44 @@
     return;
   }
 
+  /* ── 過期頁面自救 ─────────────────────────────────────────────
+   * LINE 內建瀏覽器常把整頁連同過期的 idToken 一起從快取撈回來，
+   * 客戶看到的就是「登入已失效」死頁。三道防線：
+   *   1. bfcache 撈回（pageshow persisted）→ 直接重新整理，重走 liff.init
+   *   2. 每次打後端前檢查 token 快過期 → 自動重新登入
+   *   3. 後端回 UNAUTHORIZED → 同樣自動重新登入
+   * 重新登入走 redirect，LINE 內免輸入帳密，客戶只會看到閃一下。
+   * sessionStorage 記時間戳防無限迴圈。
+   */
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) window.location.reload();
+  });
+
+  function tokenStale() {
+    try {
+      var d = liff.getDecodedIDToken();
+      return !d || !d.exp || (d.exp * 1000 - Date.now() < 60000);
+    } catch (e) { return true; }
+  }
+
+  function relogin() {
+    try {
+      var last = Number(sessionStorage.getItem('lb.relogin') || 0);
+      if (Date.now() - last < 120000) return false;   // 2 分鐘內只試一次，防迴圈
+      sessionStorage.setItem('lb.relogin', String(Date.now()));
+    } catch (e) {}
+    sub.textContent = '登入已過期，自動重新登入中…';
+    try { liff.logout(); } catch (e) {}
+    liff.login({ redirectUri: window.location.href });
+    return true;
+  }
+
+  LB.checkTokenStale = tokenStale;
+  LB.onAuthError = relogin;
+
   liff.init({ liffId: CFG.LIFF_ID }).then(function () {
-    if (!liff.isLoggedIn()) { liff.login(); return; }
+    if (!liff.isLoggedIn()) { liff.login({ redirectUri: window.location.href }); return; }
+    if (tokenStale() && relogin()) return;   // init 撈回舊 session 的過期 token
     LB.idToken = liff.getIDToken() || null;
     return liff.getProfile().then(function (p) {
       start((p.displayName || '') + ' — 請選擇日期');
