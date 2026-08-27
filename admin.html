@@ -75,6 +75,9 @@
   .btn-ok{border:1px solid var(--accent);background:var(--accent);color:#fff}
   .btn-no{border:1px solid var(--err);background:transparent;color:var(--err)}
   .acts button:disabled{opacity:.5;cursor:default}
+  .btn-sm{border:1px solid var(--rule);background:var(--card);color:var(--muted);
+    font-size:.8rem !important;padding:.35rem .7rem !important}
+  .dayacts{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem}
   .acts label{display:flex;align-items:center;gap:.3rem;font-size:.82rem;color:var(--muted)}
   .msg{font-size:.85rem;color:var(--muted)}
   .msg[data-tone="error"]{color:var(--err)}
@@ -100,6 +103,11 @@
 
   <div id="daycard" class="card hide">
     <h2 id="daytitle" style="margin:0;font-size:1rem"></h2>
+    <div class="dayacts acts">
+      <button type="button" class="btn-sm" data-dact="open_day">整日開放</button>
+      <button type="button" class="btn-sm" data-dact="close_day">整日公休</button>
+      <button type="button" class="btn-sm" data-dact="reset">回預設</button>
+    </div>
     <div id="slots"></div>
     <p class="msg" id="daymsg"></p>
   </div>
@@ -214,6 +222,13 @@
               '<button type="button" class="btn-no" data-act="reject">婉拒</button>' +
               '<label><input type="checkbox" data-block>同時封鎖</label></div>';
           }
+        } else if (s.state === 'open' || s.state === 'closed') {
+          /* 沒預約的格：單格開關。past / out_of_range 沒得調 */
+          html += '<div class="acts" data-idx="' + s.idx + '">' +
+            (s.state === 'closed'
+              ? '<button type="button" class="btn-sm" data-sact="open">開放此格</button>'
+              : '<button type="button" class="btn-sm" data-sact="close">關閉此格</button>') +
+            '<button type="button" class="btn-sm" data-sact="reset">回預設</button></div>';
         }
         html += '</div>';
       });
@@ -262,10 +277,49 @@
   });
   $('slots').addEventListener('click', function (e) {
     var btn = e.target.closest ? e.target.closest('button[data-act]') : null;
-    if (!btn) return;
-    var box = btn.closest('.acts');
-    act(box, btn.getAttribute('data-act') === 'confirm' ? 'admin.confirmBooking' : 'admin.rejectBooking');
+    if (btn) {
+      var box = btn.closest('.acts');
+      act(box, btn.getAttribute('data-act') === 'confirm' ? 'admin.confirmBooking' : 'admin.rejectBooking');
+      return;
+    }
+    var sbtn = e.target.closest ? e.target.closest('button[data-sact]') : null;
+    if (!sbtn) return;
+    var sbox = sbtn.closest('.acts');
+    setCall('admin.setSlot', {
+      date: selected,
+      slotIdx: Number(sbox.getAttribute('data-idx')),
+      action: sbtn.getAttribute('data-sact')
+    }, sbox);
   });
+
+  document.querySelector('.dayacts').addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('button[data-dact]') : null;
+    if (!btn || !selected) return;
+    var action = btn.getAttribute('data-dact');
+    if (action === 'close_day' && !window.confirm(selected + ' 整日設為公休？')) return;
+    setCall('admin.setDay', { date: selected, action: action }, btn.parentElement);
+  });
+
+  function setCall(api, payload, box) {
+    Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) { b.disabled = true; });
+    $('daymsg').textContent = '處理中…';
+    call(api, payload).then(function (data) {
+      $('daymsg').textContent = '';
+      /* 裁決過的行為：close_day 壓不掉單格的 open override，後端會回報殘留 */
+      if (data && data.remainingSlotOverrides && data.remainingSlotOverrides.length) {
+        window.alert('⚠ 已設整日公休，但以下時段有「單格開放」設定仍然有效：\n' +
+          data.remainingSlotOverrides.map(function (i) {
+            return ['11:00','13:30','16:00','18:30','21:00'][i];
+          }).join('、') + '\n要完全公休請把這些格「回預設」。');
+      }
+      loadDay(selected);
+      loadMonth();
+    }).catch(function (e2) {
+      Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) { b.disabled = false; });
+      $('daymsg').textContent = '失敗 — ' + (e2.code ? e2.code + '：' : '') + (e2.message || e2);
+      $('daymsg').setAttribute('data-tone', 'error');
+    });
+  }
 
   /* ── 起動 ── */
   if (typeof liff === 'undefined') { setStatus('LIFF SDK 載入失敗', 1); return; }

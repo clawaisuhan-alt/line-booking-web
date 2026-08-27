@@ -418,3 +418,15 @@ body.lb-body {
 .lb-notice{
   margin:.3rem 0 0;font-size:.8rem;color:var(--sk-ink-muted);
 }
+
+/* ── 我的預約（唯讀清單）──────────────────────────────────── */
+.lb-mine{margin-top:1.4rem;display:flex;flex-direction:column;gap:.6rem}
+.lb-mine h2{margin:0;font-size:1.02rem;color:var(--sk-ink)}
+.lb-mine ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.4rem}
+.lb-mine li{
+  padding:.6rem .8rem;font-family:var(--sk-font-num,var(--sk-font));
+  background:var(--sk-panel,var(--sk-bg));border:1px solid var(--sk-line);
+  border-radius:calc(var(--sk-cell-radius,.4rem) * .6);color:var(--sk-ink);
+  font-size:.92rem;
+}
+.lb-mine li[data-status="pending"]{border-color:var(--sk-accent)}

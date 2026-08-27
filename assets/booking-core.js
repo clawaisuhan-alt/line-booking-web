@@ -592,6 +592,7 @@
 
       // 空位狀態變了，快取全部作廢並重拉當月與時段
       if (LB.cacheClear) LB.cacheClear();
+      try { self.root.dispatchEvent(new CustomEvent('lb:booked', { bubbles: true })); } catch (e2) {}
       self.busy = false;
       btn.disabled = false;
       self.load();

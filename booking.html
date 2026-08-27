@@ -24,6 +24,12 @@
 
   <main id="app"></main>
 
+  <section class="lb-mine lb-hide" id="mine">
+    <h2>我的預約</h2>
+    <ul id="mineList"></ul>
+    <p class="lb-notice">如需變更或取消，請直接與本店聯繫。</p>
+  </section>
+
 </div>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -58,6 +64,28 @@
     app.load();
   }
 
+  /* ── 我的預約（唯讀，規格 §8.3）── */
+  function loadMine() {
+    if (LB.util.isMock()) return;
+    LB.util.call('myBookings', {}).then(function (raw) {
+      if (!raw || raw.ok === false) return;   // 讀不到就整區不顯示，不打擾預約主流程
+      var list = (raw.data && raw.data.bookings) || [];
+      var box = document.getElementById('mine');
+      var ul = document.getElementById('mineList');
+      if (!list.length) { box.classList.add('lb-hide'); return; }
+      ul.textContent = '';
+      list.forEach(function (b) {
+        var li = document.createElement('li');
+        li.setAttribute('data-status', b.status);
+        li.textContent = b.date + '　' + b.start + ' – ' + b.end + '　' +
+                         (b.status === 'confirmed' ? '已確認 ✅' : '待確認 ⏳');
+        ul.appendChild(li);
+      });
+      box.classList.remove('lb-hide');
+    }).catch(function () {});
+  }
+  document.getElementById('app').addEventListener('lb:booked', loadMine);
+
   if (LB.util.isMock()) {
     start('MOCK 模式 — 未設定 GAS_URL，資料為本機模擬，適合調樣式。');
     return;
@@ -73,6 +101,7 @@
     LB.idToken = liff.getIDToken() || null;
     return liff.getProfile().then(function (p) {
       start((p.displayName || '') + ' — 請選擇日期');
+      loadMine();
     });
   }).catch(function (e) {
     start('LIFF 初始化失敗（' + (e && e.code ? e.code : '無 code') + '），資料可能無法載入。');
