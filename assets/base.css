@@ -368,3 +368,48 @@ body.lb-body {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ── 預約表單與完成畫面（結構層，顏色一律走 --sk-*）────────────── */
+
+.lb-form{
+  display:flex;flex-direction:column;gap:.9rem;
+  margin-top:1.1rem;padding:1.1rem;
+  background:var(--sk-panel,var(--sk-bg));
+  border:1px solid var(--sk-line);
+  border-radius:var(--sk-cell-radius,.4rem);
+}
+.lb-form__title{
+  margin:0;font-size:1.05rem;font-weight:600;color:var(--sk-ink);
+  font-family:var(--sk-font-num,var(--sk-font));
+}
+.lb-field{display:flex;flex-direction:column;gap:.35rem;color:var(--sk-ink-muted);font-size:.85rem}
+.lb-field input,.lb-field textarea{
+  font:inherit;color:var(--sk-ink);
+  background:var(--sk-bg);
+  border:1px solid var(--sk-line);
+  border-radius:calc(var(--sk-cell-radius,.4rem) * .6);
+  padding:.55rem .7rem;
+}
+.lb-field input:focus-visible,.lb-field textarea:focus-visible{
+  outline:2px solid var(--sk-accent);outline-offset:1px;
+}
+.lb-submit{
+  font:inherit;font-weight:600;cursor:pointer;
+  color:var(--sk-accent-ink);background:var(--sk-accent);
+  border:1px solid var(--sk-accent);
+  border-radius:calc(var(--sk-cell-radius,.4rem) * .6);
+  padding:.65rem 1rem;
+}
+.lb-submit:disabled{opacity:.55;cursor:default}
+.lb-submit:focus-visible{outline:2px solid var(--sk-accent);outline-offset:2px}
+
+.lb-done{
+  margin-top:1.1rem;padding:1.1rem;
+  background:var(--sk-accent-wash,var(--sk-bg));
+  border:1px solid var(--sk-accent);
+  border-radius:var(--sk-cell-radius,.4rem);
+  display:flex;flex-direction:column;gap:.4rem;color:var(--sk-ink);
+}
+.lb-done h2{margin:0;font-size:1.05rem;color:var(--sk-accent)}
+.lb-done p{margin:0;font-family:var(--sk-font-num,var(--sk-font))}
+.lb-done__hint{color:var(--sk-ink-muted);font-size:.88rem}

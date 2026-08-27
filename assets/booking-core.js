@@ -221,10 +221,23 @@
         '<h2 class="lb-slots__title" data-role="slotstitle"></h2>' +
         '<ol class="lb-slotlist" data-role="slotlist"></ol>' +
         '<p class="lb-msg" data-role="slotmsg"></p>' +
-      '</section>';
+      '</section>' +
+      '<form class="lb-form lb-hide" data-role="form">' +
+        '<h2 class="lb-form__title" data-role="formtitle"></h2>' +
+        '<label class="lb-field"><span>姓名 *</span>' +
+          '<input name="name" type="text" maxlength="40" required autocomplete="name"></label>' +
+        '<label class="lb-field"><span>電話</span>' +
+          '<input name="phone" type="tel" maxlength="20" autocomplete="tel" inputmode="tel"></label>' +
+        '<label class="lb-field"><span>備註</span>' +
+          '<textarea name="note" maxlength="200" rows="2"></textarea></label>' +
+        '<button class="lb-submit" type="submit">送出預約</button>' +
+        '<p class="lb-msg" data-role="formmsg"></p>' +
+      '</form>' +
+      '<section class="lb-done lb-hide" data-role="done"></section>';
 
     this.el = {};
-    ['title', 'week', 'grid', 'calmsg', 'slots', 'slotstitle', 'slotlist', 'slotmsg']
+    ['title', 'week', 'grid', 'calmsg', 'slots', 'slotstitle', 'slotlist', 'slotmsg',
+     'form', 'formtitle', 'formmsg', 'done']
       .forEach(function (k) { this.el[k] = this.root.querySelector('[data-role="' + k + '"]'); }, this);
     this.el.cal = this.root.querySelector('.lb-cal');
     this.el.prev = this.root.querySelector('[data-nav="prev"]');
@@ -239,6 +252,10 @@
 
   Booking.prototype.bind = function () {
     var self = this;
+    this.el.form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      self.submit();
+    });
 
     this.el.prev.addEventListener('click', function () { self.go(-1); });
     this.el.next.addEventListener('click', function () { self.go(1); });
@@ -442,6 +459,10 @@
 
     var self = this;
     this.el.slots.classList.remove('lb-hide');
+    /* 換日就收起上一輪的表單與完成畫面，避免日期與表單標題對不上 */
+    this.el.form.classList.add('lb-hide');
+    this.el.done.classList.add('lb-hide');
+    this.pickedSlot = null;
     this.el.slotstitle.textContent = dateStr;
     this.el.slotlist.textContent = '';
     this.msg('slotmsg', '載入時段…');
@@ -499,9 +520,76 @@
     if (!slot || !BOOKABLE[slot.state]) return;
 
     if (typeof this.onBook === 'function') { this.onBook(this.selected, slot); return; }
-    this.msg('slotmsg',
-      '已選 ' + this.selected + ' ' + (slot.start || ('#' + idx)) +
-      '。Bookings.create 尚未實作（Phase A 最後一塊），送出流程待後端完成。');
+
+    this.pickedSlot = slot;
+    this.el.done.classList.add('lb-hide');
+    this.el.form.classList.remove('lb-hide');
+    this.el.formtitle.textContent =
+      this.selected + '　' + slot.start + ' – ' + slot.end;
+    this.msg('formmsg', '');
+    this.el.form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    this.el.form.elements.name.focus();
+  };
+
+  /**
+   * 送出預約。後端把「拿鎖之後重新判定」當唯一真相，
+   * 前端不做樂觀更新——成功了就清快取重拉，被拒了就把後端的話照實顯示。
+   */
+  Booking.prototype.submit = function () {
+    if (this.busy || !this.pickedSlot) return;
+    var f = this.el.form.elements;
+    var name = String(f.name.value || '').trim();
+    if (!name) { this.msg('formmsg', '請填姓名', 'error'); return; }
+
+    var self = this;
+    var btn = this.el.form.querySelector('.lb-submit');
+    this.busy = true;
+    btn.disabled = true;
+    this.msg('formmsg', '送出中…');
+
+    call('createBooking', {
+      date: this.selected,
+      slotIdx: this.pickedSlot.idx,
+      name: name,
+      phone: String(f.phone.value || '').trim(),
+      note: String(f.note.value || '').trim()
+    }).then(function (raw) {
+      if (raw && raw.ok === false) throw AD.error(raw);
+      var b = (raw && raw.data) || {};
+
+      self.el.form.classList.add('lb-hide');
+      self.el.form.reset();
+      self.el.done.classList.remove('lb-hide');
+      self.el.done.textContent = '';
+      var h = d.createElement('h2');
+      h.textContent = '預約申請已送出 ✓';
+      var p1 = d.createElement('p');
+      p1.textContent = (b.date || self.selected) + '　' +
+                       (b.start || self.pickedSlot.start) + ' – ' + (b.end || self.pickedSlot.end);
+      var p2 = d.createElement('p');
+      p2.className = 'lb-done__hint';
+      p2.textContent = '狀態：待確認。確認後會以 LINE 通知您。';
+      self.el.done.appendChild(h); self.el.done.appendChild(p1); self.el.done.appendChild(p2);
+      self.el.done.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      // 空位狀態變了，快取全部作廢並重拉當月與時段
+      if (LB.cacheClear) LB.cacheClear();
+      self.busy = false;
+      btn.disabled = false;
+      self.load();
+      self.pickDay(self.selected);
+    }).catch(function (e) {
+      self.busy = false;
+      btn.disabled = false;
+      /* 被搶先訂走是正常情境，話講白一點並讓使用者立刻看到最新狀態 */
+      var m = (e.code ? e.code + '：' : '') + (e.message || e);
+      self.msg('formmsg', '未能完成 — ' + m, 'error');
+      if (e.code === 'SLOT_UNAVAILABLE' || e.code === 'LEAD_TIME') {
+        if (LB.cacheClear) LB.cacheClear();
+        self.load();
+        self.pickDay(self.selected);
+      }
+    });
   };
 
   /* ── 匯出 ───────────────────────────────────────────────────── */
