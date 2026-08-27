@@ -152,7 +152,13 @@
     } catch (e) {}
     setStatus('登入已過期，自動重新登入中…');
     try { liff.logout(); } catch (e) {}
-    liff.login({ redirectUri: window.location.href });
+    if (liff.isInClient && liff.isInClient()) {
+      /* LIFF 瀏覽器內不可呼叫 liff.login()（會 400）——
+         登入是 liff.init() 自動做的，logout 後 reload 即重新取得新 token */
+      window.location.reload();
+    } else {
+      liff.login({ redirectUri: window.location.href });
+    }
     return true;
   }
   window.addEventListener('pageshow', function (e) {
@@ -351,7 +357,12 @@
   /* ── 起動 ── */
   if (typeof liff === 'undefined') { setStatus('LIFF SDK 載入失敗', 1); return; }
   liff.init({ liffId: LIFF_ID }).then(function () {
-    if (!liff.isLoggedIn()) { setStatus('未登入，導向 LINE Login…'); liff.login({ redirectUri: window.location.href }); return; }
+    if (!liff.isLoggedIn()) {
+      setStatus('未登入，導向 LINE Login…');
+      if (liff.isInClient && liff.isInClient()) { window.location.reload(); }
+      else { liff.login({ redirectUri: window.location.href }); }
+      return;
+    }
     if (tokenStale() && relogin()) return;
     idToken = liff.getIDToken();
     setStatus('');
