@@ -133,6 +133,11 @@
   function cacheClear() { cache = {}; }
   LB.cacheClear = cacheClear;
 
+  function cacheFresh(key) {
+    var hit = cache[key];
+    return !!(hit && (Date.now() - hit.at) < CACHE_TTL_MS);
+  }
+
   function cachedCall(action, params, key) {
     var hit = cache[key];
     if (hit && (Date.now() - hit.at) < CACHE_TTL_MS) return hit.value;
@@ -297,15 +302,28 @@
     var ceil = startOfMonth(addDays(new Date(), CFG.HORIZON_DAYS || 730));
     if (next < floor || next > ceil) return;
     this.month = next;
+    this.dir = delta < 0 ? -1 : 1;
     this.load();
   };
 
   Booking.prototype.load = function () {
     var self = this, ym = ymOf(this.month);
     this.busy = true;
-    this.msg('calmsg', '載入中…');
     this.paintTitle();
     this.paintWeek();
+
+    /* 需要真的打後端時，立刻清空月曆並顯示載入中——
+       留著上個月的格子會讓人以為換月沒反應（GAS 一趟要一兩秒）。
+       已有快取則跳過清空，直接無縫換頁。 */
+    if (!cacheFresh('m:' + ym)) {
+      this.days = {};
+      this.paintGrid();
+      this.msg('calmsg', '載入中，請稍候…');
+    }
+
+    /* 朝移動方向一次抓三個月（首次載入視為向前）。
+       三個請求平行發出、各自進快取；只有當前月驅動畫面。 */
+    this.batchMonths(this.dir || 1);
 
     return cachedCall('getMonth', { month: ym }, 'm:' + ym).then(function (raw) {
       if (raw && raw.ok === false) throw AD.error(raw);
@@ -318,7 +336,6 @@
       self.busy = false;
       self.msg('calmsg', isMock() ? 'MOCK 模式：資料為本機模擬，未連線後端。' : '');
       self.paintGrid();
-      self.prefetch();
     }).catch(function (e) {
       self.busy = false;
       self.days = {};
@@ -327,16 +344,17 @@
     });
   };
 
-  /* 畫完當月後，趁使用者在看畫面時把下個月（與上個月）先拉回快取。
-     全程靜默：成功了換月就即時，失敗了也不打擾——反正到時候會正常載入。 */
-  Booking.prototype.prefetch = function () {
+  /* 朝移動方向把接下來兩個月一併拉回快取（連同當月共三個月）。
+     全程靜默：成功了換月就即時，失敗了也不打擾——到時候會正常載入。 */
+  Booking.prototype.batchMonths = function (dir) {
     if (isMock()) return;
     var floor = startOfMonth(new Date());
     var ceil = startOfMonth(addDays(new Date(), CFG.HORIZON_DAYS || 730));
-    [1, -1].forEach(function (delta) {
+    [dir, dir * 2].forEach(function (delta) {
       var m = addMonths(this.month, delta);
       if (m < floor || m > ceil) return;
       var ym = ymOf(m);
+      if (cacheFresh('m:' + ym)) return;
       cachedCall('getMonth', { month: ym }, 'm:' + ym).catch(function () {});
     }, this);
   };

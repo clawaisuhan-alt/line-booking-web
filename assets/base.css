@@ -413,3 +413,8 @@ body.lb-body {
 .lb-done h2{margin:0;font-size:1.05rem;color:var(--sk-accent)}
 .lb-done p{margin:0;font-family:var(--sk-font-num,var(--sk-font))}
 .lb-done__hint{color:var(--sk-ink-muted);font-size:.88rem}
+
+/* 表頭的耐心警語 */
+.lb-notice{
+  margin:.3rem 0 0;font-size:.8rem;color:var(--sk-ink-muted);
+}

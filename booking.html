@@ -16,16 +16,11 @@
   <header class="lb-head">
     <h1>預約</h1>
     <p class="lb-sub" id="sub">載入中…</p>
+    <p class="lb-notice">首次開啟與切換月份需要幾秒讀取，請耐心等待 🙏</p>
   </header>
 
-  <!-- ── 皮膚切換條 ──────────────────────────────────────────────
-       開發與試樣用。正式上線要固定樣式的話，把這個 <div> 整段刪掉，
-       皮膚仍會依 LB_CONFIG.DEFAULT_SKIN 或網址 ?skin= 生效。 -->
-  <div class="lb-skinbar">
-    <label for="skinPick">皮膚</label>
-    <select id="skinPick"></select>
-    <a href="skins.html">調色間 →</a>
-  </div>
+  <!-- 皮膚切換條已移除（2026-08-26）：試皮膚改用調色間 skins.html，
+       或網址加 ?skin=washi。日後皮膚選擇移到後台。 -->
 
   <main id="app"></main>
 
@@ -51,19 +46,9 @@
 
   var CFG = window.LB_CONFIG;
   var sub = document.getElementById('sub');
-  var pick = document.getElementById('skinPick');
 
-  /* ── 皮膚選單 ── */
+  /* 皮膚仍照 DEFAULT_SKIN / ?skin= / localStorage 生效，只是不再給客戶選單 */
   LB.Skins.boot();
-  LB.Skins.list().forEach(function (s) {
-    var o = document.createElement('option');
-    o.value = s.id;
-    o.textContent = s.name;
-    pick.appendChild(o);
-  });
-  var cur = LB.Skins.current();
-  if (cur) pick.value = cur.id;
-  pick.addEventListener('change', function () { LB.Skins.apply(pick.value); });
 
   /* ── 元件 ── */
   var app = new LB.Booking(document.getElementById('app'));
