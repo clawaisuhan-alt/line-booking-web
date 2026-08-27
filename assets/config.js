@@ -15,7 +15,7 @@
      * 2026-08-26：傳輸層與回應形狀都已對齊實際後端（部署 @4），
      * 填入網址即可從 MOCK 切到正式後端。
      */
-    GAS_URL: '',
+    GAS_URL: 'https://script.google.com/macros/s/AKfycbyxFgaXWd932IzRUb2wqH-r164B3t3K-F0gkxls9DpK7vfZR6_7DM1FeuJjGFTjh3R1Og/exec',
 
     LIFF_ID: '2011187534-1zGL0McE',   // booking-dev
 
