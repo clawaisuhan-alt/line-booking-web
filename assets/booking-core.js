@@ -121,6 +121,33 @@
     return !CFG.GAS_URL;
   }
 
+  /* ── 快取與預抓 ─────────────────────────────────────────────
+   * GAS 每次呼叫要冷啟動 + 開試算表 + 查 Calendar + 302 轉址，
+   * 單次 1~3 秒是天性壓不掉；能壓的是「頻率」。
+   * 空檔狀態變動不頻繁（別人訂走一格才會變），90 秒內重看同一個月
+   * 直接用快取；建立預約成功後應呼叫 cacheClear() 讓畫面重新拉。
+   */
+  var CACHE_TTL_MS = 90 * 1000;
+  var cache = {};   /* key -> { at, value(Promise) } */
+
+  function cacheClear() { cache = {}; }
+  LB.cacheClear = cacheClear;
+
+  function cachedCall(action, params, key) {
+    var hit = cache[key];
+    if (hit && (Date.now() - hit.at) < CACHE_TTL_MS) return hit.value;
+    var value = call(action, params).then(function (raw) {
+      /* 失敗的回應不留在快取裡，下次重試 */
+      if (!raw || raw.ok === false) delete cache[key];
+      return raw;
+    }, function (e) {
+      delete cache[key];
+      throw e;
+    });
+    cache[key] = { at: Date.now(), value: value };
+    return value;
+  }
+
   function call(action, params) {
     if (isMock()) {
       return new Promise(function (res) {
@@ -263,7 +290,7 @@
     this.paintTitle();
     this.paintWeek();
 
-    return call('getMonth', { month: ym }).then(function (raw) {
+    return cachedCall('getMonth', { month: ym }, 'm:' + ym).then(function (raw) {
       if (raw && raw.ok === false) throw AD.error(raw);
       var list = AD.month(raw);
       self.days = {};
@@ -274,12 +301,27 @@
       self.busy = false;
       self.msg('calmsg', isMock() ? 'MOCK 模式：資料為本機模擬，未連線後端。' : '');
       self.paintGrid();
+      self.prefetch();
     }).catch(function (e) {
       self.busy = false;
       self.days = {};
       self.paintGrid();
       self.msg('calmsg', '讀取失敗 — ' + (e.code ? e.code + '：' : '') + (e.message || e), 'error');
     });
+  };
+
+  /* 畫完當月後，趁使用者在看畫面時把下個月（與上個月）先拉回快取。
+     全程靜默：成功了換月就即時，失敗了也不打擾——反正到時候會正常載入。 */
+  Booking.prototype.prefetch = function () {
+    if (isMock()) return;
+    var floor = startOfMonth(new Date());
+    var ceil = startOfMonth(addDays(new Date(), CFG.HORIZON_DAYS || 730));
+    [1, -1].forEach(function (delta) {
+      var m = addMonths(this.month, delta);
+      if (m < floor || m > ceil) return;
+      var ym = ymOf(m);
+      cachedCall('getMonth', { month: ym }, 'm:' + ym).catch(function () {});
+    }, this);
   };
 
   Booking.prototype.msg = function (key, txt, tone) {
@@ -404,7 +446,7 @@
     this.el.slotlist.textContent = '';
     this.msg('slotmsg', '載入時段…');
 
-    call('getDay', { date: dateStr }).then(function (raw) {
+    cachedCall('getDay', { date: dateStr }, 'd:' + dateStr).then(function (raw) {
       if (raw && raw.ok === false) throw AD.error(raw);
       self.slots = AD.day(raw);
       self.paintSlots();
