@@ -337,6 +337,8 @@
     Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) { b.disabled = true; });
     $('daymsg').textContent = '處理中…';
     call(api, payload).then(function (data) {
+      /* .dayacts 三顆是靜態元素，不像 #slots 會整塊重建，成功後必須自己解鎖 */
+      Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) { b.disabled = false; });
       $('daymsg').textContent = '';
       /* 裁決過的行為：close_day 壓不掉單格的 open override，後端會回報殘留 */
       if (data && data.remainingSlotOverrides && data.remainingSlotOverrides.length) {
