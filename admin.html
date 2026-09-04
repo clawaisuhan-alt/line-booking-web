@@ -107,6 +107,7 @@
       <button type="button" class="btn-sm" data-dact="open_day">整日開放</button>
       <button type="button" class="btn-sm" data-dact="close_day">整日公休</button>
       <button type="button" class="btn-sm" data-dact="reset">回預設</button>
+      <button type="button" class="btn-sm" data-dact="reschedule">整日改期</button>
     </div>
     <div id="slots"></div>
     <p class="msg" id="daymsg"></p>
@@ -254,6 +255,10 @@
               '<button type="button" class="btn-ok" data-act="confirm">確認</button>' +
               '<button type="button" class="btn-no" data-act="reject">婉拒</button>' +
               '<label><input type="checkbox" data-block>同時封鎖</label></div>';
+          } else if (b.status === 'confirmed') {
+            /* v1.5 改期退場：與顧客人工談妥新時間後，把這筆從系統移出（不推播） */
+            html += '<div class="acts" data-bid="' + esc(b.bookingId) + '">' +
+              '<button type="button" class="btn-no" data-act="cancel">取消（已改期）</button></div>';
           }
         } else if (s.state === 'open' || s.state === 'closed') {
           /* 沒預約的格：單格開關。past / out_of_range 沒得調 */
@@ -276,6 +281,10 @@
   function act(box, action) {
     var bid = box.getAttribute('data-bid');
     var payload = { bookingId: bid };
+    if (action === 'admin.cancelBooking') {
+      /* v1.5：取消不推播——前提是新時間已人工談妥，這裡把前提講明 */
+      if (!window.confirm('取消這筆預約？\n系統「不會」通知顧客——請確認已與顧客人工談妥改期。\n之後請把新時間記入你的主日曆。')) return;
+    }
     if (action === 'admin.rejectBooking') {
       var reason = window.prompt('婉拒原因（會推播給客戶，可留空）', '');
       if (reason === null) return;                     // 按取消
@@ -312,7 +321,9 @@
     var btn = e.target.closest ? e.target.closest('button[data-act]') : null;
     if (btn) {
       var box = btn.closest('.acts');
-      act(box, btn.getAttribute('data-act') === 'confirm' ? 'admin.confirmBooking' : 'admin.rejectBooking');
+      var a = btn.getAttribute('data-act');
+      act(box, a === 'confirm' ? 'admin.confirmBooking' :
+               a === 'cancel'  ? 'admin.cancelBooking'  : 'admin.rejectBooking');
       return;
     }
     var sbtn = e.target.closest ? e.target.closest('button[data-sact]') : null;
@@ -329,6 +340,12 @@
     var btn = e.target.closest ? e.target.closest('button[data-dact]') : null;
     if (!btn || !selected) return;
     var action = btn.getAttribute('data-dact');
+    if (action === 'reschedule') {
+      /* v1.5 整日改期：取消全日（不推播）＋自動公休 */
+      if (!window.confirm(selected + ' 整日改期？\n該日「全部」系統預約會被取消且「不會」通知顧客\n（請確認新時間都已人工談妥），並自動設為整日公休。')) return;
+      setCall('admin.rescheduleDay', { date: selected }, btn.parentElement);
+      return;
+    }
     if (action === 'close_day' && !window.confirm(selected + ' 整日設為公休？')) return;
     setCall('admin.setDay', { date: selected, action: action }, btn.parentElement);
   });
@@ -337,9 +354,11 @@
     Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) { b.disabled = true; });
     $('daymsg').textContent = '處理中…';
     call(api, payload).then(function (data) {
-      /* .dayacts 三顆是靜態元素，不像 #slots 會整塊重建，成功後必須自己解鎖 */
+      /* .dayacts 是靜態元素，不像 #slots 會整塊重建，成功後必須自己解鎖 */
       Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) { b.disabled = false; });
-      $('daymsg').textContent = '';
+      $('daymsg').textContent = (data && data.cancelled)
+        ? '整日改期完成：已取消 ' + data.cancelled.length + ' 筆（未推播）並設公休'
+        : '';
       /* 裁決過的行為：close_day 壓不掉單格的 open override，後端會回報殘留 */
       if (data && data.remainingSlotOverrides && data.remainingSlotOverrides.length) {
         window.alert('⚠ 已設整日公休，但以下時段有「單格開放」設定仍然有效：\n' +
