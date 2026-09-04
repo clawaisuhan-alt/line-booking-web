@@ -96,7 +96,7 @@
       <h2 id="title"></h2>
       <button id="next" type="button" aria-label="下個月">→</button>
     </div>
-    <ol class="wk"><li>日</li><li>一</li><li>二</li><li>三</li><li>四</li><li>五</li><li>六</li></ol>
+    <ol class="wk"><li>一</li><li>二</li><li>三</li><li>四</li><li>五</li><li>六</li><li>日</li></ol>
     <ol class="grid" id="grid"></ol>
     <p class="msg" id="calmsg"></p>
   </div>
@@ -196,7 +196,7 @@
 
     call('admin.getMonth', { year: y, month: m }).then(function (data) {
       $('calmsg').textContent = '';
-      var first = new Date(y, m - 1, 1).getDay();
+      var first = (new Date(y, m - 1, 1).getDay() + 6) % 7;   /* 週一為每週首日 */
       var days = new Date(y, m, 0).getDate();
       var html = '';
       for (var i = 0; i < first; i++) html += '<li></li>';

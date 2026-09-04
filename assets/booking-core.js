@@ -401,10 +401,11 @@
 
   Booking.prototype.paintWeek = function () {
     var labels = CFG.WEEKDAY_LABELS || ['日', '一', '二', '三', '四', '五', '六'];
-    var html = '', i;
+    var html = '', i, wd;
     for (i = 0; i < 7; i++) {
+      wd = (i + 1) % 7;   /* 週一為每週首欄；labels 仍以 getDay() 的 0=日 索引 */
       html += '<li class="lb-week__cell">' +
-        esc(S().text('weekdayLabel', [i], labels[i])) + '</li>';
+        esc(S().text('weekdayLabel', [wd], labels[wd])) + '</li>';
     }
     this.el.week.innerHTML = html;
   };
@@ -412,7 +413,7 @@
   Booking.prototype.paintGrid = function () {
     var self = this;
     var first = startOfMonth(this.month);
-    var lead = first.getDay();
+    var lead = (first.getDay() + 6) % 7;   /* 週一起始的前置空格數 */
     var n = daysInMonth(first);
     var frag = d.createDocumentFragment();
     var i;
